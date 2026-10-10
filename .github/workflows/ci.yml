@@ -1,0 +1,139 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# The SA password "Sqlvec_CI_Only_2026!" below is a throwaway for ephemeral CI
+# containers, not a secret. It's written out literally because the `env`
+# context isn't available in `services:` or job-level `env:`.
+env:
+  MSSQL_SA_PASSWORD: Sqlvec_CI_Only_2026!
+
+jobs:
+  lint-and-unit:
+    name: lint + unit (py${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - run: pip install -e ".[dev]"
+      - run: ruff check .
+      - run: ruff format --check .
+      - run: pytest -m "not integration"
+
+  integration:
+    name: integration (SQL Server 2025 container)
+    runs-on: ubuntu-latest
+    services:
+      mssql:
+        image: mcr.microsoft.com/mssql/server:2025-latest
+        env:
+          ACCEPT_EULA: "Y"
+          MSSQL_PID: Developer
+          MSSQL_SA_PASSWORD: Sqlvec_CI_Only_2026!
+        ports:
+          - 1433:1433
+    env:
+      SQLVEC_TEST_CONN: Server=localhost,1433;Database=sqlvec_test;UID=sa;PWD=Sqlvec_CI_Only_2026!;Encrypt=yes;TrustServerCertificate=yes
+      SQLVEC_CONN: Server=localhost,1433;Database=sqlvec_ci;UID=sa;PWD=Sqlvec_CI_Only_2026!;Encrypt=yes;TrustServerCertificate=yes
+      SQLVEC_EMBED_DIMS: "384"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      # mssql-python's Linux wheels ship the Microsoft ODBC Driver 18 bits, so
+      # there's no msodbcsql18 / unixODBC apt install here.
+      - run: pip install -e ".[dev]"
+      - name: Wait for SQL Server
+        run: python scripts/wait_for_sql.py --timeout 180
+        env:
+          SQLVEC_CONN: Server=localhost,1433;Database=master;UID=sa;PWD=Sqlvec_CI_Only_2026!;Encrypt=yes;TrustServerCertificate=yes
+      - name: Integration tests
+        run: pytest -m integration -v -rs
+      - name: CLI smoke test
+        run: |
+          sqlvec doctor || true
+          sqlvec init --create-database
+          sqlvec doctor
+          sqlvec ingest examples/docs -q
+          sqlvec search "how do I keep the database free" --mode exact -k 3
+          sqlvec search "how do I keep the database free" -k 3
+          sqlvec index
+          sqlvec cost
+          sqlvec compare-pg --format markdown > /dev/null
+      - name: Benchmark (5k x 384)
+        run: |
+          mkdir -p bench-results
+          sqlvec bench -n 5000 --dims 384 --queries 100 --out bench-results/ci-5k-384
+          {
+            echo "### sqlvec bench on the GitHub-hosted runner"
+            echo
+            cat bench-results/ci-5k-384.md
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bench-ci-5k-384
+          path: bench-results/
+          if-no-files-found: warn
+
+  integration-fts:
+    # Hybrid and fts modes need SQL Server Full-Text Search, which the
+    # official image doesn't include. This job builds docker/fts (adds
+    # mssql-server-fts from Microsoft's apt repo). It's best effort: if the
+    # package or repo layout changes, the job fails without failing CI.
+    name: integration + full-text (best effort)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    env:
+      SQLVEC_TEST_CONN: Server=localhost,1433;Database=sqlvec_test;UID=sa;PWD=Sqlvec_CI_Only_2026!;Encrypt=yes;TrustServerCertificate=yes
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -e ".[dev]"
+      - name: Build and start SQL Server 2025 + full-text
+        run: |
+          docker build -t sqlvec-mssql-fts docker/fts
+          docker run -d --name mssql -p 1433:1433 \
+            -e ACCEPT_EULA=Y -e MSSQL_PID=Developer -e MSSQL_SA_PASSWORD \
+            sqlvec-mssql-fts
+      - name: Wait for SQL Server
+        run: python scripts/wait_for_sql.py --timeout 180
+        env:
+          SQLVEC_CONN: Server=localhost,1433;Database=master;UID=sa;PWD=Sqlvec_CI_Only_2026!;Encrypt=yes;TrustServerCertificate=yes
+      - name: Integration tests (fts / hybrid must not skip here)
+        run: |
+          pytest -m integration -v -rs | tee pytest.log
+          if grep -q "full-text search is not installed" pytest.log; then
+            echo "full-text tests were skipped; the fts image didn't work" >&2
+            exit 1
+          fi
+      - if: failure()
+        run: docker logs mssql | tail -50
+
+  bicep:
+    name: bicep build + lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: az bicep install
+      - run: az bicep build --file infra/main.bicep --stdout > /dev/null
+      - run: az bicep lint --file infra/main.bicep

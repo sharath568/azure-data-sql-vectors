@@ -1,0 +1,37 @@
+# Local SQL Server 2025, Developer edition (free for dev/test, not production).
+#
+#   docker compose up -d                          # official image on localhost,1433
+#   docker compose --profile fts up -d --build    # also a full-text image on localhost,1434
+#
+# Needs about 2 GB of RAM for the container. The password is a throwaway for
+# a local container only (it matches the default in src/sqlvec/config.py).
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2025-latest
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: "Developer"
+      MSSQL_SA_PASSWORD: "Sqlvec_Local_Dev_2026!"
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqlvec-data:/var/opt/mssql
+
+  # Same thing plus mssql-server-fts (the official image has no full-text),
+  # needed for the fts and hybrid search modes. Point SQLVEC_CONN at
+  # Server=localhost,1434 to use it.
+  sqlserver-fts:
+    build: docker/fts
+    profiles: ["fts"]
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: "Developer"
+      MSSQL_SA_PASSWORD: "Sqlvec_Local_Dev_2026!"
+    ports:
+      - "1434:1433"
+    volumes:
+      - sqlvec-fts-data:/var/opt/mssql
+
+volumes:
+  sqlvec-data:
+  sqlvec-fts-data:
