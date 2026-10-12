@@ -28,10 +28,13 @@
 
 -- 1. Outbound REST calls. Enabled by default on Azure SQL Database (and
 --    Fabric); must be switched on for SQL Server 2025 and Managed Instance.
+--    Dynamic SQL, because Azure SQL Database rejects RECONFIGURE when it
+--    compiles the batch ("Statement 'CONFIG' is not supported"), even in a
+--    branch that never runs there.
 IF CAST(SERVERPROPERTY('EngineEdition') AS INT) <> 5
 BEGIN
     EXEC sp_configure 'external rest endpoint enabled', 1;
-    RECONFIGURE WITH OVERRIDE;
+    EXEC (N'RECONFIGURE WITH OVERRIDE');
 END
 GO
 

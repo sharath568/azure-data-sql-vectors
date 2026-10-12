@@ -245,8 +245,11 @@ sqlcmd -S <server>.database.windows.net -d sqlvec -U sqlvecadmin -P '<pwd>' \
 
 sqlvec never runs this script for you. It stores an API key in a database
 scoped credential, which is fine for a demo; use a managed identity for
-anything real. I haven't run it end to end yet (no Azure run from this repo
-so far), so treat it as a starting point.
+anything real. I ran it end to end on Azure SQL Database on 2026-10-11
+(see [docs/azure-run.md](docs/azure-run.md)): both procedures work, and the
+run caught one bug (Azure SQL refuses to compile `RECONFIGURE`, even in a
+branch that doesn't run there), now fixed. With `sqlcmd` missing, nl2sql's
+`scripts/run_tsql.py` or any batch runner that splits on `GO` will do.
 
 ## How hybrid search works
 

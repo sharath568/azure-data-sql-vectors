@@ -4,6 +4,29 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- First Azure run ([docs/azure-run.md](docs/azure-run.md)): Azure SQL
+  Database free offer in Central US, `sqlvec bench` at 5k x 384 and
+  50k x 1536 ([docs/bench/](docs/bench/README.md)), and the in-database
+  embeddings script end to end.
+- `EMBED_SKU` in `scripts/up.sh` to pick the embedding deployment SKU.
+- `python -m sqlvec`.
+
+### Fixed
+
+- `sql/azure/in_db_embeddings.sql` failed on Azure SQL Database: it rejects
+  `RECONFIGURE` at compile time even in a branch that doesn't run. Now
+  dynamic SQL.
+
+### Changed
+
+- `infra/README.md`: the free offer only accepts the default 60-minute
+  auto-pause delay (tested); Free Trial limit of one Azure OpenAI account
+  per region; macOS OpenSSL note.
+
 ## [0.1.0] - 2026-10-10
 
 First release.

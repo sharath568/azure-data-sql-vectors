@@ -73,9 +73,16 @@ $ sqlvec cost --sessions 20 --active-minutes 30
 
 That's 30-minute working sessions at about 1 vCore. With the default
 60-minute delay, the idle tail (49,200 vCore-seconds) costs more than the
-work (36,000). Dropping the delay to 15 minutes nearly doubles the number
-of sessions that fit. Try `AUTOPAUSE_DELAY=15 ./scripts/up.sh`; I haven't
-confirmed the free offer accepts 15, which is why it isn't the default.
+work (36,000). Dropping the delay to 15 minutes would nearly double the
+number of sessions that fit, **but the free offer doesn't allow it.** I
+tried `AUTOPAUSE_DELAY=15 ./scripts/up.sh` on 2026-10-11 and the deployment
+failed with "Only default value for auto pause delay is allowed for Free
+Limit database with auto pause exhaustion behavior". With
+`freeLimitExhaustionBehavior: 'AutoPause'` you get 60 minutes. A shorter
+delay only works on a normal (billed) serverless database, which is a trade
+I wouldn't make for a demo: the idle tail is cheaper than losing the
+can't-overspend guarantee. The fastest way to stop the idle meter is to
+delete the database when you're done.
 
 A 5k x 384 `sqlvec bench` run is a few minutes of work, so a handful of
 bench runs a month fits comfortably.
@@ -92,10 +99,23 @@ bench runs a month fits comfortably.
 - **API versions:** `Microsoft.Sql` 2023-08-01, Cognitive Services
   2024-10-01, budgets 2023-11-01. The template builds and lints cleanly
   with Bicep 0.48.1 (`bicep build`, `bicep lint`), and CI checks that on
-  every push. It has **not** been deployed from this repo yet.
+  every push. I deployed it to `centralus` on 2026-10-11 (database) with
+  Azure OpenAI in `eastus`; the results are in
+  [docs/bench/](../docs/bench/) and [docs/azure-run.md](../docs/azure-run.md).
 - **Model availability:** not every region offers `text-embedding-3-small`
   with the `Standard` deployment type. If it fails, set
-  `embeddingDeploymentSku=GlobalStandard` or another `OPENAI_LOCATION`.
+  `EMBED_SKU=GlobalStandard` or another `OPENAI_LOCATION`.
+- **One Azure OpenAI account per region on a Free Trial.** The trial
+  subscription I used had an `OpenAI.S0.AccountCount` limit of 1 per region
+  (`az cognitiveservices usage list -l <region>`). If another project
+  already has an account in your region, the deployment fails preflight
+  with `InsufficientQuota`; set `OPENAI_LOCATION` to another region.
+- **macOS: OpenSSL for the driver.** `mssql-python`'s bundled driver needs
+  OpenSSL 3. With Homebrew's `openssl@3`, the first connection failed with
+  "OpenSSL library could not be loaded" until I set
+  `DYLD_LIBRARY_PATH=/opt/homebrew/opt/openssl@3/lib`. macOS drops that
+  variable when it runs `/bin/sh` scripts, including the `sqlvec` console
+  script in a venv whose path contains a space; `python -m sqlvec` keeps it.
 - **Prices** in this repo are reference values. Use the
   [Azure pricing calculator](https://azure.microsoft.com/pricing/calculator/).
 

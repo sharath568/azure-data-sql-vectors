@@ -12,6 +12,7 @@
 #   AUTOPAUSE_DELAY  minutes idle before pausing    (default: 60; 15 burns fewer vCore-seconds)
 #   DEPLOY_OPENAI    true/false                     (default: false)
 #   OPENAI_LOCATION  region for Azure OpenAI        (default: LOCATION)
+#   EMBED_SKU        Standard or GlobalStandard     (default: Standard)
 #
 # The free offer database pauses itself when the monthly allowance is gone,
 # so it can't run up a bill. Azure OpenAI (if deployed) is pay per token.
@@ -24,6 +25,7 @@ MONTHLY_BUDGET="${MONTHLY_BUDGET:-5}"
 AUTOPAUSE_DELAY="${AUTOPAUSE_DELAY:-60}"
 DEPLOY_OPENAI="${DEPLOY_OPENAI:-false}"
 OPENAI_LOCATION="${OPENAI_LOCATION:-$LOCATION}"
+EMBED_SKU="${EMBED_SKU:-Standard}"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OUT_ENV="$ROOT/.env.azure"
 
@@ -59,6 +61,7 @@ OUTPUTS="$(az deployment group create \
       autoPauseDelayMinutes="$AUTOPAUSE_DELAY" \
       deployOpenAi="$DEPLOY_OPENAI" \
       openAiLocation="$OPENAI_LOCATION" \
+      embeddingDeploymentSku="$EMBED_SKU" \
   --query properties.outputs --output json)"
 
 out() { echo "$OUTPUTS" | python3 -c "import json,sys; print(json.load(sys.stdin)['$1']['value'])"; }

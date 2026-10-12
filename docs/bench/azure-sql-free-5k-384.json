@@ -1,0 +1,55 @@
+{
+  "n": 5000,
+  "dims": 384,
+  "queries": 100,
+  "k": 10,
+  "seed": 42,
+  "clusters": 64,
+  "noise": 1.0,
+  "environment": {
+    "platform": "Azure SQL Database",
+    "product_version": "12.0.2000.8",
+    "engine_edition": 5,
+    "version_banner": "Microsoft SQL Azure (RTM) - 12.0.2000.8 Sep 17 2026 07:51:49 Copyright (C) 2026 Microsoft Corporation",
+    "preview_features": false,
+    "client_platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+    "client_python": "3.14.8",
+    "client_cpu_count": 18,
+    "server_cpu_count": 2,
+    "server_memory_gib": 911.9,
+    "driver": "mssql-python 1.15.0"
+  },
+  "load_seconds": 7.15,
+  "space_before_index": {
+    "rows": 5000,
+    "reserved_kb": 8072,
+    "data_kb": 8000,
+    "index_kb": 40,
+    "unused_kb": 32
+  },
+  "exact_latency": {
+    "p50_ms": 95.135,
+    "p95_ms": 181.637,
+    "mean_ms": 110.021
+  },
+  "exact_recall": 1.0,
+  "ann_build_seconds": 15.43,
+  "ann_index_version": "3",
+  "ann_syntax": "SELECT TOP (k) WITH APPROXIMATE ... VECTOR_SEARCH",
+  "ann_latency": {
+    "p50_ms": 116.051,
+    "p95_ms": 153.638,
+    "mean_ms": 126.034
+  },
+  "ann_recall": 0.999,
+  "space_after_index": {
+    "rows": 5000,
+    "reserved_kb": 10848,
+    "data_kb": 8000,
+    "index_kb": 2616,
+    "unused_kb": 232
+  },
+  "notes": [
+    "sp_spaceused is reported as-is. I haven't confirmed from the docs whether it counts the DiskANN graph's internal storage, so compare before/after with care."
+  ]
+}
